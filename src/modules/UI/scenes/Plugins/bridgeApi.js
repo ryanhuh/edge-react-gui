@@ -10,12 +10,17 @@ import { createCustomWalletListModal } from '../../../../components/modals/Custo
 import { SEND_CONFIRMATION } from '../../../../constants/SceneKeys.js'
 import type { GuiMakeSpendInfo } from '../../../../reducers/scenes/SendConfirmationReducer.js'
 import * as CORE_SELECTORS from '../../../Core/selectors.js'
+import * as WALLET_API from '../../../Core/Wallets/api'
 import * as UI_SELECTORS from '../../../UI/selectors.js'
 
 type EdgeReceiveAddress = {
   publicAddress?: string,
   segwitAddress?: string,
   legacyAddress?: string
+}
+type Address = {
+  encodeUri: string,
+  address: EdgeReceiveAddress
 }
 type EdgeRequestSpendOptions = {
   // Specify the currencyCode to spend to this URI. Required for spending tokens
@@ -47,6 +52,7 @@ class EdgeProvider extends Bridgeable {
   _dispatch: Function
   _backClick: Function
   _navStack: Array<string>
+  _context: any
   backHandler: { handleBack(): Promise<number> }
   static instanceTracker = {}
   static handleBack () {
@@ -64,13 +70,14 @@ class EdgeProvider extends Bridgeable {
       EdgeProvider.instanceTracker.instance._navStack = []
     }
   }
-  constructor (plugin: any, state: any, dispatch: Function, backClick: Function) {
+  constructor (plugin: any, state: any, dispatch: Function, backClick: Function, context: Object) {
     super()
     this._plugin = plugin
     this._state = state
     this._dispatch = dispatch
     this._backClick = backClick
     this._navStack = []
+    this._context = context
     this.constructor.instanceTracker.instance = this
   }
   navStackPush (arg: string) {
@@ -141,11 +148,13 @@ class EdgeProvider extends Bridgeable {
   // Read data back from the user's account. This can only access data written by this same plugin
   // 'keys' is an array of strings with keys to lookup.
   // Returns an object with a map of key value pairs from the keys passed in
-  async readData (keys: Array<string>): Object {
+  async readData (keys: Array<string>): Promise<Object> {
     const account = CORE_SELECTORS.getAccount(this._state)
     const folder = account.pluginData
     const returnObj = {}
     for (let i = 0; i < keys.length; i++) {
+      const string = keys[i]
+      console.log('key', string)
       try {
         const value = (await folder.getItem('pluginId', keys[i])) || undefined
         returnObj[keys[i]] = value
@@ -154,6 +163,37 @@ class EdgeProvider extends Bridgeable {
       }
     }
     return Promise.resolve(returnObj)
+  }
+
+  // Request Wallets
+  wallets (currencyCodes: Array<string> = []) {
+    const wallets = this._context.wallets
+    const retObj = {}
+    for (const key in wallets) {
+      const wallet = wallets[key]
+      if (currencyCodes.length === 0) {
+        retObj[key] = {
+          id: key,
+          currencyCode: wallet.currencyCode,
+          name: wallet.name
+        }
+      } else if (currencyCodes.includes(wallet.currencyCode)) {
+        retObj[key] = {
+          id: key,
+          currencyCode: wallet.currencyCode,
+          name: wallet.name
+        }
+      }
+    }
+    return retObj
+  }
+  async getAddress (data: any): Promise<Address> {
+    const walletId = data.walletId
+    const coreWallet = this._context.coreWallets[walletId]
+    const currencyCode = data.currencyCode
+    const address = await WALLET_API.getReceiveAddress(coreWallet, currencyCode)
+    const encodeUri = await coreWallet.encodeUri(address)
+    return { encodeUri, address }
   }
 
   // Request that the user spend to an address or multiple addresses

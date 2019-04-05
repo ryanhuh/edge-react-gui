@@ -54,7 +54,7 @@ export function renderYaobPluginBackButton (label: string = BACK) {
   return <BackButton withArrow onPress={handleMyClick} label={label} />
 }
 
-class PluginView extends React.Component<PluginProps, PluginState> {
+class PluginViewYAOB extends React.Component<PluginProps, PluginState> {
   plugin: any
   webview: any
   yaobBridge: Bridge
@@ -109,6 +109,7 @@ class PluginView extends React.Component<PluginProps, PluginState> {
     let data = null
     try {
       data = JSON.parse(event.nativeEvent.data)
+      console.log('YAOB: data', data)
       this.yaobBridge.handleMessage(data)
     } catch (e) {
       console.log('this was the E. so there ')
@@ -126,7 +127,15 @@ class PluginView extends React.Component<PluginProps, PluginState> {
     this.yaobBridge = new Bridge({
       sendMessage: message => this.webview.injectJavaScript(`window.bridge.handleMessage(${JSON.stringify(message)})`)
     })
-    const edgeProvider = new EdgeProvider(this.props.plugin, this.props.currentState, this.props.thisDispatch, this.backButtonClickHandler)
+    const context = {
+      coreWallets: this.props.coreWallets,
+      wallets: this.props.wallets,
+      walletName: this.props.walletName,
+      walletId: this.props.coreWallet && this.props.coreWallet.id ? this.props.coreWallet.id : null,
+      wallet: this.props.coreWallet
+    }
+
+    const edgeProvider = new EdgeProvider(this.props.plugin, this.props.currentState, this.props.thisDispatch, this.backButtonClickHandler, context)
     this.yaobBridge.sendRoot(edgeProvider)
   }
 
@@ -170,11 +179,11 @@ class PluginView extends React.Component<PluginProps, PluginState> {
 const mapStateToProps = state => {
   const account = CORE_SELECTORS.getAccount(state)
   const guiWallet = UI_SELECTORS.getSelectedWallet(state)
-  const coreWallet = CORE_SELECTORS.getWallet(state, guiWallet.id)
+  const coreWallet = guiWallet && guiWallet.id ? CORE_SELECTORS.getWallet(state, guiWallet.id) : null
   const coreWallets = state.core.wallets.byId
   const wallets = state.ui.wallets.byId
-  const walletName = coreWallet.name
-  const walletId = coreWallet.id
+  const walletName = coreWallet ? coreWallet.name : null
+  const walletId = coreWallet ? coreWallet.id : null
   const currentState = state
   return {
     account,
@@ -198,5 +207,5 @@ const mapDispatchToProps = dispatch => ({
 const PluginViewYAOBConnect = connect(
   mapStateToProps,
   mapDispatchToProps
-)(PluginView)
+)(PluginViewYAOB)
 export { PluginViewYAOBConnect }
