@@ -9,7 +9,7 @@ import slowlog from 'react-native-slowlog'
 import { sprintf } from 'sprintf-js'
 
 import { UniqueIdentifierModalConnect as UniqueIdentifierModal } from '../../connectors/UniqueIdentifierModalConnector.js'
-import { getSpecialCurrencyInfo } from '../../constants/indexConstants.js'
+import { FEE_ALERT_THRESHOLD, FEE_COLOR_THRESHOLD, getSpecialCurrencyInfo } from '../../constants/indexConstants.js'
 import { intl } from '../../locales/intl'
 import s from '../../locales/strings.js'
 import { makeSpend } from '../../modules/Core/Wallets/api.js'
@@ -169,7 +169,7 @@ export class SendConfirmation extends Component<Props, State> {
   }
 
   render () {
-    const { networkFee, parentNetworkFee, exchangeRates } = this.props
+    const { networkFee, parentNetworkFee } = this.props
     const primaryInfo: GuiCurrencyInfo = {
       displayCurrencyCode: this.props.currencyCode,
       displayDenomination: this.props.primaryDisplayDenomination,
@@ -208,7 +208,7 @@ export class SendConfirmation extends Component<Props, State> {
       this.props.sliderDisabled || !feeCalculated || (!getSpecialCurrencyInfo(this.props.currencyCode).allowZeroTx && this.props.nativeAmount === '0')
 
     const isTaggableCurrency = !!getSpecialCurrencyInfo(currencyCode).uniqueIdentifier
-
+    const networkFeeData = this.getNetworkFeeData()
     return (
       <SafeAreaView>
         <Gradient style={styles.view}>
@@ -250,7 +250,7 @@ export class SendConfirmation extends Component<Props, State> {
                 <Scene.Item style={{ alignItems: 'center', flex: -1 }}>
                   {feeCalculated && (
                     <Scene.Row style={{ paddingVertical: 4 }}>
-                      <Text style={[styles.feeAreaText]}>{this.networkFeeSyntax()}</Text>
+                      <Text style={[styles.feeAreaText, networkFeeData.feeStyle]}>{networkFeeData.feeSyntax}</Text>
                     </Scene.Row>
                   )}
 
@@ -365,9 +365,10 @@ export class SendConfirmation extends Component<Props, State> {
     }
   }
 
-  networkFeeSyntax = () => {
+  getNetworkFeeData = (): { feeSyntax: string, feeStyle: Object } => {
     const { networkFee, parentNetworkFee, parentDisplayDenomination, exchangeRates } = this.props
-    if (!networkFee && !parentNetworkFee) return ''
+    let feeStyle = {}
+    if (!networkFee && !parentNetworkFee) return { feeSyntax: '', feeStyle }
 
     const primaryInfo: GuiCurrencyInfo = {
       displayCurrencyCode: this.props.currencyCode,
@@ -403,7 +404,10 @@ export class SendConfirmation extends Component<Props, State> {
       usedNetworkFee = networkFee
       currencyCode = this.props.parentExchangeDenomination.name
     } else {
-      return ''
+      return {
+        feeSyntax: '',
+        feeStyle
+      }
     }
     const cryptoFeeSymbol = denomination.symbol ? denomination.symbol : ''
     const displayDenomMultiplier = denomination.multiplier
@@ -420,7 +424,17 @@ export class SendConfirmation extends Component<Props, State> {
     const fiatFeeAmountString = fiatFeeAmount.toFixed(2)
     const fiatFeeAmountPretty = bns.toFixed(fiatFeeAmountString, 2, 2)
     const fiatFeeString = `${fiatFeeSymbol} ${fiatFeeAmountPretty}`
-    return sprintf(s.strings.send_confirmation_fee_line, cryptoFeeString, fiatFeeString)
+    const feeAmountInUSD = convertCurrencyFromExchangeRates(exchangeRates, currencyCode, 'iso:USD', parseFloat(cryptoFeeExchangeAmount))
+    // check if fee is high enough to signal a warning to user (via font color)
+    if (feeAmountInUSD > FEE_ALERT_THRESHOLD) {
+      feeStyle = styles.feeDanger
+    } else if (feeAmountInUSD > FEE_COLOR_THRESHOLD) {
+      feeStyle = styles.feeWarning
+    }
+    return {
+      feeSyntax: sprintf(s.strings.send_confirmation_fee_line, cryptoFeeString, fiatFeeString),
+      feeStyle
+    }
   }
 }
 
