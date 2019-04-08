@@ -397,12 +397,12 @@ export class SendConfirmation extends Component<Props, State> {
       denomination = parentDisplayDenomination
       exchangeDenomination = this.props.parentExchangeDenomination
       usedNetworkFee = parentNetworkFee
-      currencyCode = this.props.currencyCode
+      currencyCode = exchangeDenomination.name
     } else if (networkFee && bns.gt(networkFee, '0')) {
       denomination = primaryInfo.displayDenomination
       exchangeDenomination = this.props.primaryExchangeDenomination
       usedNetworkFee = networkFee
-      currencyCode = this.props.parentExchangeDenomination.name
+      currencyCode = this.props.currencyCode
     } else {
       return {
         feeSyntax: '',
